@@ -12,8 +12,7 @@ async def run():
 
     # Подключение к PX4. Порт 14580 — тот, что слушает PX4 (проверено через ss).
     # Формат "udp://host:port" в старом API = подключение как клиент.
-    await drone.connect(system_address="udpout://127.0.0.1:14580")
-
+    await drone.connect(system_address="udpin://0.0.0.0:14540")
     print("Ожидание подключения к PX4...")
     async for state in drone.core.connection_state():
         if state.is_connected:
