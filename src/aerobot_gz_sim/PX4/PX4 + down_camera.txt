@@ -1,0 +1,125 @@
+============================================================
+   ЗАПУСК PX4: МИССИЯ + ВИДЕО С НИЖНЕЙ КАМЕРЫ
+              (4 терминала)
+============================================================
+
+Предполагается, что PX4, Gazebo Garden, QGC и пакеты
+ros-humble-ros-gzgarden-* уже установлены.
+
+Скрипт миссии: ~/Firmware2/src/aerobot_gz_sim/PX4/mission_px4.py
+Мир Gazebo:    second_scene_world_v1.sdf
+
+------------------------------------------------------------
+ШАГ 0. ОЧИСТКА ПРОЦЕССОВ
+------------------------------------------------------------
+Откройте терминал и выполните ОДНИМ блоком:
+
+pkill -9 -f px4; pkill -9 -f "gz sim"; pkill -9 -f QGroundControl; pkill -9 -f parameter_bridge; pkill -9 -f rqt_image_view; sleep 3; ps aux | grep -E "px4|gz sim|parameter_bridge" | grep -v grep
+
+Последняя часть вывода должна быть пустой.
+
+------------------------------------------------------------
+ШАГ 1. GAZEBO + PX4 (Терминал №1)
+------------------------------------------------------------
+Откройте ПЕРВЫЙ терминал (Ctrl+Alt+T).
+Скопируйте и вставьте ОДНИМ блоком:
+
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2 && source install/setup.bash && \
+export GZ_SIM_RESOURCE_PATH=$HOME/Firmware2/src/aerobot_gz_sim/worlds:$HOME/Firmware2/src/aerobot_gz_sim/models:$GZ_SIM_RESOURCE_PATH && \
+gz sim -r second_scene_world_v1.sdf & \
+sleep 15 && \
+cd ~/PX4-Autopilot && \
+export PX4_SYS_AUTOSTART=4001 && \
+export PX4_SIM_MODEL=gz_x500 && \
+export PX4_GZ_MODEL_NAME=uav1 && \
+./build/px4_sitl_default/bin/px4 -i 0
+
+Дождитесь:
+  - окна Gazebo с миром и дроном uav1;
+  - строки INFO  [px4] Startup script returned successfully;
+  - приглашения pxh>.
+
+НЕ ЗАКРЫВАЙТЕ этот терминал.
+
+------------------------------------------------------------
+ШАГ 2. МОСТ КАМЕРЫ (Терминал №2)
+------------------------------------------------------------
+Откройте ВТОРОЙ терминал (Ctrl+Alt+T).
+Скопируйте и вставьте ОДНИМ блоком:
+
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2 && source install/setup.bash && \
+ros2 run ros_gz_bridge parameter_bridge \
+  '/world/default/model/uav1/link/mono_cam_down/base_link/sensor/imager/image@sensor_msgs/msg/Image@gz.msgs.Image' \
+  '/world/default/model/uav1/link/mono_cam/base_link/sensor/imager/image@sensor_msgs/msg/Image@gz.msgs.Image' \
+  '/world/default/clock@rosgraph_msgs/msg/Clock@gz.msgs.Clock' \
+  --ros-args \
+  -r '/world/default/model/uav1/link/mono_cam_down/base_link/sensor/imager/image:=/uav1/camera_down' \
+  -r '/world/default/model/uav1/link/mono_cam/base_link/sensor/imager/image:=/uav1/camera' \
+  -r '/world/default/clock:=/clock'
+
+НЕ ЗАКРЫВАЙТЕ терминал — мост должен работать.
+
+------------------------------------------------------------
+ШАГ 3. ПРОСМОТР ВИДЕО (Терминал №3)
+------------------------------------------------------------
+Откройте ТРЕТИЙ терминал (Ctrl+Alt+T).
+Скопируйте и вставьте ОДНИМ блоком:
+
+source /opt/ros/humble/setup.bash && \
+ros2 run rqt_image_view rqt_image_view
+
+В открывшемся окне в левом верхнем углу нажмите
+на выпадающий список и выберите: /uav1/camera_down
+
+Должно появиться изображение с нижней камеры дрона.
+
+НЕ ЗАКРЫВАЙТЕ терминал.
+
+------------------------------------------------------------
+ШАГ 4. МИССИЯ + QGC (Терминал №4)
+------------------------------------------------------------
+Откройте ЧЕТВЁРТЫЙ терминал (Ctrl+Alt+T).
+Скопируйте и вставьте ОДНИМ блоком:
+
+~/Загрузки/QGroundControl.AppImage & \
+sleep 10 && \
+cd ~/Firmware2/src/aerobot_gz_sim/PX4 && \
+python3 mission_px4.py
+
+Что произойдёт:
+  1. Откроется QGroundControl, подключится к PX4.
+  2. Скрипт начнёт миссию: взлёт -> зависание -> посадка.
+  3. В окне rqt_image_view видно видео с камеры во время полёта.
+
+Ожидаемый вывод скрипта:
+
+  [OK] PX4 подключён!
+  [OK] Готов к взлёту!
+  [1/3] Взлёт на 1.5 м...
+  [2/3] Зависание 20 сек...
+  [3/3] Посадка...
+  === DONE ===
+
+------------------------------------------------------------
+ИТОГОВАЯ ТАБЛИЦА ТЕРМИНАЛОВ
+------------------------------------------------------------
+Терминал №1 : Gazebo + PX4 SITL
+Терминал №2 : ros_gz_bridge (мост камер)
+Терминал №3 : rqt_image_view (окно с видео)
+Терминал №4 : QGC + mission_px4.py (миссия)
+
+------------------------------------------------------------
+ЕСЛИ ЧТО-ТО НЕ РАБОТАЕТ
+------------------------------------------------------------
+- Мост падает — пришлите вывод Терминала №2.
+- В rqt_image_view нет топика /uav1/camera_down — проверьте:
+    ros2 topic list | grep camera
+- Миссия зависает на "Ожидание готовности (GPS/EKF)" —
+  подождите 1–2 минуты, PX4 SITL иногда долго проходит
+  health checks.
+- Ошибки [vehicle_imu] timestamp error в Терминале №1 —
+  безобидны, игнорируйте.
+
+============================================================
