@@ -2,3 +2,12 @@
 build/
 install/
 log/
+vscode/
+build/
+install/
+log/
+*.pyc
+__pycache__/
+.~lock.*
+*.odt
+

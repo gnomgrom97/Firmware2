@@ -1,0 +1,49 @@
+============================================================
+   ИНСТРУКЦИЯ ПО ЗАПУСКУ СИМУЛЯТОРА PX4 И МИССИИ
+                    (2 ТЕРМИНАЛА)
+============================================================
+
+ШАГ 0. ОЧИСТКА ПРОЦЕССОВ
+------------------------------------------------------------
+pkill -9 -f px4; pkill -9 -f "gz sim"; pkill -9 -f QGroundControl; sleep 3; ps aux | grep -E "px4|gz sim|QGroundControl" | grep -v grep
+(последняя часть вывода должна быть пустой)
+
+ШАГ 1. GAZEBO + PX4 (Терминал №1)
+------------------------------------------------------------
+Скопируйте и вставьте одним блоком:
+
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2 && source install/setup.bash && \
+export GZ_SIM_RESOURCE_PATH=$HOME/Firmware2/src/aerobot_gz_sim/worlds:$HOME/Firmware2/src/aerobot_gz_sim/models:$GZ_SIM_RESOURCE_PATH && \
+gz sim -r second_scene_world_v1.sdf & \
+sleep 15 && \
+cd ~/PX4-Autopilot && \
+export PX4_SYS_AUTOSTART=4001 && \
+export PX4_SIM_MODEL=gz_x500 && \
+export PX4_GZ_MODEL_NAME=uav1 && \
+./build/px4_sitl_default/bin/px4 -i 0
+
+Дождитесь pxh> и окна Gazebo. Не закрывайте терминал.
+
+ШАГ 2. QGC + МИССИЯ (Терминал №2)
+------------------------------------------------------------
+Скопируйте и вставьте одним блоком (когда в Терминале №1 появится pxh>):
+Запуск  QGroundControl.AppImage осуществляется из папки загрузки. Нужно на раб. ноуте переписать 
+его запуск с установленной папки
+~/Загрузки/QGroundControl.AppImage & sleep 10 && \
+cd ~/Firmware2/src/aerobot_gz_sim/PX4 && python3 mission_px4.py
+
+Ожидаемый вывод:
+[OK] PX4 подключён!
+[OK] Готов к взлёту!
+[1/3] Взлёт на 1.5 м...
+[2/3] Зависание 20 сек...
+[3/3] Посадка...
+=== DONE ===
+
+ИТОГ
+------------------------------------------------------------
+Терминал №1 : Gazebo (фон) + PX4 SITL (передний план)
+Терминал №2 : QGC (фон) + mission_px4.py (передний план)
+
+Всего 3 блока для копирования: очистка, запуск №1, запуск №2.
