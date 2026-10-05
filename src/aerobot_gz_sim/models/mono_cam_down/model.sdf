@@ -26,10 +26,10 @@
         </geometry>
       </visual> -->
 
-      <sensor name="imager" type="camera">
+      <!--
+<sensor name="imager" type="camera">
         <pose>0 0 0 0 0 0</pose>
         <camera>
-          <!-- FOV consistent with ORB gazebo_uav1_mono.yaml (fx=269.968, width=640) -->
           <horizontal_fov>1.755126</horizontal_fov>
           <image>
             <width>640</width>
@@ -57,10 +57,11 @@
           </clip>
         </camera>
         <always_on>1</always_on>
-        <update_rate>36</update_rate>
+        <update_rate>10</update_rate>
         <visualize>true</visualize>
-        <!-- <topic>camera_down</topic> -->
+        
       </sensor>
+-->
       <gravity>true</gravity>
       <velocity_decay/>
     </link>

@@ -152,7 +152,18 @@
         <static>false</static>
         <pose>3.7856374470307368 -4.3004851712486714 0.30000000298023224 0 0 0</pose>
     </include>
+    
+    <include>
+    	<name>red_dot_1</name>
+    	<uri>model://cylinder_0.5</uri>
+    	<pose>-1.61 1.28 0.25 0 0 0</pose>
+    </include>
 
+<include>
+    <name>red_dot_2</name>
+    <uri>model://cylinder_0.75</uri>
+    <pose>4 0 0.25 0 0 0</pose>
+</include>
     <include>
         <uri>model://0_land_platform_test</uri>
         <static>false</static>
