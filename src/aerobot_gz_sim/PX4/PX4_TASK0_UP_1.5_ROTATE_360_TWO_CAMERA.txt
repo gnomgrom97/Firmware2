@@ -1,0 +1,118 @@
+============================================================
+   ЗАПУСК TASK0_ROTATE: ВЗЛЁТ 1.5 М + ОБОРОТ 360°
+              С ВИДЕО С ДВУХ КАМЕР
+                    (4 терминала)
+============================================================
+
+Скрипт:  ~/Firmware2/src/aerobot_gz_sim/PX4/task0_rotate.py
+Мир:     first_task_world_test_without_car.sdf
+Launch:  aerobot_first_test_mavros_without_car.launch.py
+NS:      /uav1
+
+------------------------------------------------------------
+ШАГ 0. ОЧИСТКА ПРОЦЕССОВ
+------------------------------------------------------------
+pkill -9 -f px4; pkill -9 -f "gz sim"; pkill -9 -f mavros; \
+pkill -9 -f QGroundControl; pkill -9 -f task0; \
+pkill -9 -f image_view; pkill -9 -f parameter_bridge; sleep 3; \
+ps aux | grep -E "px4|gz sim|mavros|image_view" | grep -v grep
+
+Последняя часть вывода должна быть ПУСТОЙ.
+
+------------------------------------------------------------
+ШАГ 1. МИР + MAVROS (Терминал №1)
+------------------------------------------------------------
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2 && source install/setup.bash && \
+export GZ_SIM_RESOURCE_PATH=$HOME/Firmware2/src/aerobot_gz_sim/worlds:$HOME/Firmware2/src/aerobot_gz_sim/models:$GZ_SIM_RESOURCE_PATH && \
+ros2 launch aerobot_gz_sim aerobot_first_test_mavros_without_car.launch.py
+
+Дождитесь открытия Gazebo с миром и дроном.
+НЕ ЗАКРЫВАЙТЕ терминал.
+
+------------------------------------------------------------
+ШАГ 2. QGroundControl (Терминал №2)
+------------------------------------------------------------
+~/Загрузки/QGroundControl.AppImage &
+
+Дождитесь статуса Connected в QGC (10-15 секунд).
+Сообщение "Download QGC stable version failed" игнорируйте.
+
+------------------------------------------------------------
+ШАГ 3. МОСТ КАМЕР + 2 ОКНА ВИДЕО (Терминал №3)
+------------------------------------------------------------
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2 && source install/setup.bash && \
+ros2 run ros_gz_bridge parameter_bridge \
+  '/world/default/model/uav1/link/mono_cam/base_link/sensor/imager/image@sensor_msgs/msg/Image@gz.msgs.Image' \
+  '/world/default/model/uav1/link/mono_cam_down/base_link/sensor/imager/image@sensor_msgs/msg/Image@gz.msgs.Image' \
+  --ros-args \
+  -r '/world/default/model/uav1/link/mono_cam/base_link/sensor/imager/image:=/uav1/camera' \
+  -r '/world/default/model/uav1/link/mono_cam_down/base_link/sensor/imager/image:=/uav1/camera_down' &
+sleep 5 && \
+ros2 run image_view image_view --ros-args -r image:=/uav1/camera & \
+ros2 run image_view image_view --ros-args -r image:=/uav1/camera_down & \
+wait
+
+Откроются ДВА окна:
+  - одно с передней камерой (/uav1/camera);
+  - второе с нижней камерой (/uav1/camera_down).
+НЕ ЗАКРЫВАЙТЕ терминал.
+
+------------------------------------------------------------
+ШАГ 4. МИССИЯ (Терминал №4)
+------------------------------------------------------------
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2/src/aerobot_gz_sim/PX4 && \
+python3 task0_rotate.py
+
+Ожидаемый вывод:
+
+  [INFO] Жду MAVROS, local_position, сервисы...
+  [INFO] Старт: x=... y=... z=... yaw=...°
+  [INFO] Состояние: INIT -> PRESTREAM
+  [INFO] Состояние: PRESTREAM -> ARMING
+  [INFO] force arm: success=True result=0
+  [INFO] Состояние: ARMING -> TAKEOFF
+  [INFO] Взлёт: z=0.50 м, уставка=0.50 м
+  [INFO] Взлёт: z=1.50 м, уставка=1.50 м
+  [INFO] Высота 1.5 м достигнута, начинаю оборот
+  [INFO] Состояние: TAKEOFF -> ROTATE
+  [INFO] Оборот: 90° / 360° (25%)
+  [INFO] Оборот: 180° / 360° (50%)
+  [INFO] Оборот: 270° / 360° (75%)
+  [INFO] Оборот: 360° / 360° (100%)
+  [INFO] Оборот завершён
+  [INFO] Состояние: ROTATE -> LANDING
+  [INFO] Приземлились. Миссия завершена.
+
+Во время поворота в окнах image_view видно,
+как меняется картинка с камер.
+
+------------------------------------------------------------
+ИТОГОВАЯ ТАБЛИЦА ТЕРМИНАЛОВ
+------------------------------------------------------------
+Терминал №1 : Мир + PX4 + MAVROS (launch)
+Терминал №2 : QGroundControl
+Терминал №3 : Мост камер + 2 окна image_view
+Терминал №4 : Миссия task0_rotate.py
+
+------------------------------------------------------------
+ЕСЛИ ЧТО-ТО НЕ РАБОТАЕТ
+------------------------------------------------------------
+- Окна image_view пустые — проверьте топики:
+    source /opt/ros/humble/setup.bash
+    ros2 topic list | grep camera
+    ros2 topic hz /uav1/camera
+
+- ARMING не проходит — проверьте QGC (Connected).
+  Быстрый обход через консоль PX4:
+    telnet localhost 4560
+    pxh> commander arm -f
+    pxh> commander status
+
+- Оборот не завершается — пришлите вывод скрипта.
+
+- Ошибки [vehicle_imu] timestamp error — безобидны, игнорируйте.
+============================================================
+EOF
