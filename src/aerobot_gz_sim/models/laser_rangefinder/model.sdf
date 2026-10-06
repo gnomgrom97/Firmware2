@@ -46,7 +46,6 @@
             <stddev>0</stddev>
           </noise>
         </ray>
-        <plugin name="laser" filename="libGpuRayPlugin.so" />
        <!-- <plugin name="gazebo_ros_head_rplidar_controller" filename="libgazebo_ros_gpu_laser.so">
           <topicName>/rangefinder</topicName>
           <frameName>rangefinder</frameName>
