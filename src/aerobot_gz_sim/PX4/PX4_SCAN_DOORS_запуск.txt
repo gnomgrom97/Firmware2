@@ -1,0 +1,130 @@
+============================================================
+   ЗАПУСК МИССИИ: ПОИСК ДВЕРНЫХ ПРОЁМОВ ЧЕРЕЗ ЛИДАР
+                    (5 терминалов)
+============================================================
+
+Скрипт:  ~/Firmware2/src/aerobot_gz_sim/PX4/task_scan_doors.py
+Мир:     first_task_world_test_without_car.sdf
+Launch:  aerobot_first_test_mavros_without_car.launch.py
+NS:      /uav1
+
+Миссия: взлёт на 1.5 м -> скан лидаром (1 сек) -> анализ проёмов -> посадка.
+
+------------------------------------------------------------
+ШАГ 0. ОЧИСТКА ПРОЦЕССОВ
+------------------------------------------------------------
+pkill -9 -f px4; pkill -9 -f "gz sim"; pkill -9 -f mavros; \
+pkill -9 -f parameter_bridge; pkill -9 -f image_view; \
+pkill -9 -f QGroundControl; pkill -9 -f rviz2; \
+pkill -9 -f "ros2 launch"; sleep 3
+
+ps aux | grep -E "gz sim|px4|mavros|parameter_bridge" | grep -v grep
+(должно быть ПУСТО)
+
+------------------------------------------------------------
+ШАГ 1. МИР + PX4 (Терминал №1)
+------------------------------------------------------------
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export QT_QPA_PLATFORM=xcb
+
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2 && source install/setup.bash && \
+export GZ_SIM_RESOURCE_PATH=$HOME/Firmware2/src/aerobot_gz_sim/worlds:$HOME/Firmware2/src/aerobot_gz_sim/models:$GZ_SIM_RESOURCE_PATH && \
+ros2 launch aerobot_gz_sim aerobot_first_test_mavros_without_car.launch.py
+
+Дождитесь окна Gazebo. НЕ ЗАКРЫВАЙТЕ.
+
+------------------------------------------------------------
+ШАГ 2. MAVROS (Терминал №2)
+------------------------------------------------------------
+source /opt/ros/humble/setup.bash && \
+source ~/mavros_ws/install/setup.bash && \
+ros2 run mavros mavros_node --ros-args \
+  -r __ns:=/uav1 \
+  -p fcu_url:=udp://:14540@127.0.0.1:14580 \
+  -p tgt_system:=1 \
+  -p tgt_component:=1
+
+НЕ ЗАКРЫВАЙТЕ.
+
+------------------------------------------------------------
+ШАГ 3. QGROUNDCONTROL (Терминал №3)
+------------------------------------------------------------
+nohup ~/Загрузки/QGroundControl.AppImage > /dev/null 2>&1 &
+
+Дождитесь статуса Connected в QGC (10-15 секунд).
+
+------------------------------------------------------------
+ШАГ 4. ПРОВЕРКА (Терминал №4)
+------------------------------------------------------------
+source /opt/ros/humble/setup.bash
+
+ros2 topic echo /uav1/mavros/state --once
+  (должно быть connected: true)
+
+ros2 topic hz /uav1/scan
+  (должно быть ~10 Гц)
+
+ros2 topic hz /uav1/camera_down
+  (должно быть ~10 Гц)
+
+------------------------------------------------------------
+ШАГ 5. ЗАПУСК МИССИИ (Терминал №5)
+------------------------------------------------------------
+source /opt/ros/humble/setup.bash && \
+cd ~/Firmware2/src/aerobot_gz_sim/PX4 && \
+python3 task_scan_doors.py
+
+Ожидаемый вывод:
+
+  [INFO] Жду MAVROS, local_position, лидар, сервисы...
+  [INFO] Старт: x=0.00 y=0.00 z=0.00 yaw=0°
+  [INFO] Состояние: INIT -> PRESTREAM
+  [INFO] Состояние: PRESTREAM -> ARMING
+  [INFO] force arm: success=True result=0
+  [INFO] Состояние: ARMING -> TAKEOFF
+  [INFO] Взлёт: z=1.50 м, уставка=1.50 м
+  [INFO] Высота достигнута, начинаю скан
+  [INFO] Состояние: TAKEOFF -> SCAN
+  [INFO] Скан: собрано 5 снимков, осталось 0.6 с
+  [INFO] Скан завершён, анализирую проёмы...
+  [INFO] ============================================================
+  [INFO] ОБНАРУЖЕНО ДВЕРНЫХ ПРОЁМОВ: N
+  [INFO] ============================================================
+  [INFO] Проём 1: угол +XX° от старта, ширина ~XX°, дистанция ~XX.X м
+  [INFO] ============================================================
+  [INFO] Приземлились. Миссия завершена.
+
+------------------------------------------------------------
+ИТОГОВАЯ ТАБЛИЦА ТЕРМИНАЛОВ
+------------------------------------------------------------
+Терминал №1 : Gazebo + PX4 (launch)
+Терминал №2 : MAVROS (вручную)
+Терминал №3 : QGroundControl
+Терминал №4 : Проверка топиков
+Терминал №5 : task_scan_doors.py (миссия)
+
+------------------------------------------------------------
+ЕСЛИ ЧТО-ТО НЕ РАБОТАЕТ
+------------------------------------------------------------
+- Зависает на INIT:
+    ros2 topic list | grep -E "scan|mavros/state"
+  Если /uav1/mavros/state нет — MAVROS не запущен (Терминал №2).
+
+- ARMING не проходит: QGC должен быть Connected.
+  Быстрый обход:
+    telnet localhost 4560
+    pxh> commander arm -f
+
+- Проёмов 0: подстроить в task_scan_doors.py
+    DOOR_RATIO = 1.3    (было 1.6)
+    DOOR_MIN_WIDTH_DEG = 5    (было 8)
+
+- Находит слишком много: увеличить
+    DOOR_RATIO = 2.0
+    DOOR_MIN_WIDTH_DEG = 15
+
+- libEGL warning — игнорировать, если Gazebo открылся.
+
+============================================================
